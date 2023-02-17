@@ -1,7 +1,7 @@
 import os
 import random
 import numpy as np
-
+import h5py
 import torch
 from torch.utils.data import Dataset, DataLoader
 
@@ -75,13 +75,48 @@ class GlanceDataset(Dataset):
             idx: int
         """
         res = dict(self.examples[idx])
-        resampled_feature, ori_nframes = resample(
-            torch.from_numpy(
-                np.load(
-                    os.path.join(self.config[self.dataset_name]["feature_dir"], "{}.npy".format(res["video_id"]))
-                ).astype(np.float32)
-            ), target_length=self.config[self.dataset_name]["video_feature_len"]
-        )
+        dataset_name = self.dataset_name + '_' + self.config["name"]
+
+        # #chara-i3d
+        if dataset_name == "charadessta_i3d":
+            resampled_feature, ori_nframes = resample(
+                torch.from_numpy(
+                    np.squeeze(
+                            np.load(os.path.join(self.config[self.dataset_name]["feature_dir"], "{}.npy".format(res["video_id"]))
+                        ).astype(np.float32)
+                    )
+                ), target_length=self.config[self.dataset_name]["video_feature_len"]
+            )
+  
+        # # chara-c3d
+        elif dataset_name == "charadessta_c3d":
+            resampled_feature, ori_nframes = resample(
+                torch.from_numpy(
+                    np.float32(torch.load(
+                    os.path.join(self.config[self.dataset_name]["feature_dir"], "{}.pt".format(res["video_id"]))
+                        )
+                    )
+                ), target_length=self.config[self.dataset_name]["video_feature_len"]
+            )
+
+        # chara-vgg  tacos
+        elif dataset_name == "charadessta_vgg" or dataset_name == "tacos_c3d":
+            resampled_feature, ori_nframes = resample(      # (T,dim)→(target_length,dim)
+                torch.from_numpy(
+                    np.load(
+                        os.path.join(self.config[self.dataset_name]["feature_dir"], "{}.npy".format(res["video_id"]))
+                    ).astype(np.float32)
+                ), target_length=self.config[self.dataset_name]["video_feature_len"]
+            )
+
+        # activitynet
+        elif dataset_name == "activitynetcaptions_c3d":
+            f = h5py.File('/mnt/cephfs/dataset/anet_c3d/sub_activitynet_c3d.hdf5','r')
+            resampled_feature, ori_nframes = resample(
+                    torch.from_numpy(np.asarray(f[res["video_id"]]['c3d_features']).astype(np.float32))
+                    , target_length=self.config[self.dataset_name]["video_feature_len"]
+                    )  
+         
         video_mask = torch.zeros(self.config[self.dataset_name]["video_feature_len"], dtype=torch.float32)
         video_mask[:ori_nframes] = 1.0  # ori_nframes may overshoot
         video_len = torch.sum(video_mask, dim=0).to(torch.long).item()
@@ -89,6 +124,7 @@ class GlanceDataset(Dataset):
         start_frame = min(max(round(res["start_frac"] * video_len), 0), video_len - 1)
         end_frame = min(max(round(res["end_frac"] * video_len), start_frame), video_len - 1)
         glance_frame = min(max(round(res["glance_frac"] * video_len), 0), end_frame)
+        # glance_frame = (start_frame + end_frame) // 2
 
         res.update({
             "video": resampled_feature,
@@ -146,20 +182,20 @@ def prepare_data(config, dataset_name):
     train_ds = GlanceDataset(dataset_name, config, "train")
     train_ds.build_vocab_and_encode_queries()
     vocab = train_ds.vocab
-    valid_ds = GlanceDataset(dataset_name, config, "valid")
-    valid_ds.build_vocab_and_encode_queries(vocab)
+    # valid_ds = GlanceDataset(dataset_name, config, "valid")
+    # valid_ds.build_vocab_and_encode_queries(vocab)
     test_ds = GlanceDataset(dataset_name, config, "test")
     test_ds.build_vocab_and_encode_queries(vocab)
 
     dev = config["train"]["dev"]
     batch_size = config[dataset_name]["batch_size"]
     train_dl = get_dataloader(train_ds, batch_size, dev)
-    valid_dl = get_dataloader(valid_ds, batch_size, dev)
+    # valid_dl = get_dataloader(valid_ds, batch_size, dev)
     test_dl = get_dataloader(test_ds, 128, dev)  # fixed batch size for eval
 
     return {
         "train_dl": train_dl,
-        "valid_dl": valid_dl,
+        # "valid_dl": valid_dl,
         "test_dl": test_dl,
         "vocab": vocab
     }

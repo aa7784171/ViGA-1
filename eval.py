@@ -71,23 +71,52 @@ class Evaluator(object):
             self.best_score = self._res_to_score(res)
 
     def eval_dataloader(self, model, dataloader, epoch=0):
-        model.eval_mode()
+        model.eval()
         preds = []
         gts = []
         loss = 0
+        max1_eval = 0
+        max5_eval = 0
+        min1_eval = 0
+        min5_eval = 0
+        total_eval = 0
         with torch.no_grad():
             for batch in tqdm(dataloader, total=len(dataloader), desc="Evaluating epoch {}".format(epoch)):
-                pred = model.forward_eval(batch)
-                loss += model.forward_train_val(batch).item()
+                pred = model(batch,"eval")
+                loss_temp, attn_weights =model(batch,"train") 
+                loss_temp = loss_temp.mean()
+                loss += loss_temp.item()
                 preds.append(pred)
                 gts.append(torch.stack([batch["start_frac"], batch["end_frac"]], dim=1))
+                
+                #seed_acc                
+                total_eval += len(batch['idx'])
+                batch['start_frame'] = batch['start_frame'].cuda()
+                batch['end_frame'] = batch['end_frame'].cuda()
+
+                for i in range(len(batch['idx'])):
+                    if batch['start_frame'][i] <= (torch.topk(attn_weights,1).indices+1)[i] <= batch['end_frame'][i]:
+                        max1_eval += 1
+                    for j in (torch.topk(attn_weights,5).indices+1)[i]:
+                        if batch['start_frame'][i] <= j <= batch['end_frame'][i]:
+                            max5_eval += 1
+                            break    
+                    
+                    if not batch['start_frame'][i] <= (torch.topk(attn_weights,1,largest=False).indices+1)[i] <= batch['end_frame'][i]:
+                        min1_eval += 1
+                    for j in (torch.topk(attn_weights,5,largest=False).indices+1)[i]:
+                        if not batch['start_frame'][i] <= j <= batch['end_frame'][i]:
+                            min5_eval += 1
+                            break  
+                        
         loss /= len(dataloader)
         preds = torch.cat(preds, dim=0)
-        gts = torch.cat(gts, dim=0)
+        gts = torch.cat(gts, dim=0).cuda()
         self._update(preds, gts, epoch)
         print(self.report_current())
         print(self.report_best())
-        return loss
+        return loss, total_eval, max1_eval, max5_eval, min1_eval, min5_eval
+
 
     def report_current(self):
         return "This epoch {}\n{}".format(self.epoch, self._res_to_string(self.res))

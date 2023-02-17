@@ -1,13 +1,15 @@
 ################## Configuration for starting a new training task from scratch. ##################
 # default float is torch.float32; default int is torch.long
-
-exp_dir: log  # save training outputs in /log
-
+name : base
+# exp_dir: ../logs/source_VIGA  # save training outputs in /log
+exp_dir: ../checkpoints/experiments/reproduce/charades_c3d # save training outputs in /log
+# draw_dir: ../checkpoints/experiments/reproduce/charades_c3d/tensorboard
+# 与代码保存路径一致 checkpoint_path
 model:
   n_layers: 2
   dim: 512  # must be even due to bi-gru we have in model
   dropout: 0.1
-  glove_path: "data/glove.840B.300d.txt"
+  glove_path: "/mnt/cephfs/dataset/yishen/glove.840B.300d.txt"
   temp: 0.07
   topk: 1
 
@@ -23,7 +25,7 @@ train:
 #dataset_name: tacos
 
 activitynetcaptions:
-  feature_dir: data/activitynetcaptions/c3d
+  feature_dir: /mnt/cephfs/dataset/anet_c3d/sub_activitynet_c3d.hdf5
   feature_dim: 500
   video_feature_len: 256
   batch_size: 256
@@ -55,20 +57,20 @@ activitynetcaptions:
     - 0.9
 
 charadessta:
-  feature_dir: data/charadessta/c3d
-  feature_dim: 4096
-  video_feature_len: 256
-  batch_size: 256
+  # feature_dir: /mnt/cephfs/dataset/yishen/charadessta/c3d
+  # feature_dim: 4096
+  # video_feature_len: 256
+  # batch_size: 256
 
-#  feature_dir: data/charadessta/i3d
-#  feature_dim: 1024
-#  video_feature_len: 128
-#  batch_size: 512
+  feature_dir: /mnt/cephfs/dataset/yishen/charadessta/i3d
+  feature_dim: 1024
+  video_feature_len: 128
+  batch_size: 512
 
-#  feature_dir: data/charadessta/vgg
-#  feature_dim: 4096
-#  video_feature_len: 256
-#  batch_size: 256
+  # feature_dir: /mnt/cephfs/dataset/yishen/charadessta/vgg
+  # feature_dim: 4096
+  # video_feature_len: 256
+  # batch_size: 256
 
   clip_frames:
     - 8

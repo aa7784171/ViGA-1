@@ -101,6 +101,7 @@ class QueryGRUEncoder(nn.Module):
         """
         lengths = torch.sum(query_mask, dim=1).to(torch.long)
         query_emb = self.we(query)
+        lengths[0] = query_emb.shape[1]
         packed = torch.nn.utils.rnn.pack_padded_sequence(
             input=query_emb, lengths=lengths.tolist(), batch_first=True, enforce_sorted=False
         )

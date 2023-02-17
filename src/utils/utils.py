@@ -10,6 +10,7 @@ import math
 from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
+import h5py
 
 
 def get_now():
@@ -65,7 +66,7 @@ def load_config(yaml_dir):
         res = yaml.safe_load(f)
 
     # build directory if does not exist
-    Path(res["exp_dir"]).mkdir(parents=True, exist_ok=True)
+    # Path(res["exp_dir"]).mkdir(parents=True, exist_ok=True)
     return res
 
 
@@ -77,29 +78,37 @@ def load_annotations_activitynetcaptions(split):
         "test": "val_2.json"
     }
 
-    annotation_folder_path = os.path.join("data", "activitynetcaptions", "annotations", "glance")
+    annotation_folder_path = os.path.join('/mnt/cephfs/dataset/yishen/activitynetcaptions/annotations/glance')
 
     annotations = {}
-
+    with h5py.File('/mnt/cephfs/dataset/anet_c3d/sub_activitynet_c3d.hdf5', 'r') as f:
+        file=[]
+        for key in f.keys():
+            file.append(key)
+        f.close()
+        
     with open(os.path.join(annotation_folder_path, split2filename[split]), "r") as annotation_file:
         json_obj = json.load(annotation_file)
         idx = 0
+        #activnet
         for video_id in tqdm(json_obj.keys(), desc="Loading ActivityNet Captions {} annotations".format(split)):
             video_anno = json_obj[video_id]
-            for i in range(len(video_anno["timestamps"])):
-                annotation = video_anno["sentences"][i]
-                annotations[idx] = {
-                    "idx": idx,
-                    "video_id": video_id,
-                    "duration": video_anno["duration"],
+            for item in file:
+                if video_id == item:
+                    for i in range(len(video_anno["timestamps"])):
+                        annotation = video_anno["sentences"][i]
+                        annotations[idx] = {
+                            "idx": idx,
+                            "video_id": video_id,
+                            "duration": video_anno["duration"],
 
-                    "annotation": annotation,
+                            "annotation": annotation,
 
-                    "start_frac": safe_division(video_anno["timestamps"][i][0], video_anno["duration"]),
-                    "end_frac": safe_division(video_anno["timestamps"][i][1], video_anno["duration"]),
-                    "glance_frac": safe_division(video_anno["glance"][i], video_anno["duration"])
-                }
-                idx += 1
+                            "start_frac": safe_division(video_anno["timestamps"][i][0], video_anno["duration"]), 
+                            "end_frac": safe_division(video_anno["timestamps"][i][1], video_anno["duration"]),
+                            "glance_frac": safe_division(video_anno["glance"][i], video_anno["duration"])
+                        }
+                        idx += 1    
     return annotations
 
 
@@ -114,7 +123,7 @@ def load_annotations_charadessta(split):
             "valid": "Charades_v1_test.csv",
             "test": "Charades_v1_test.csv"
         }
-        annotation_folder_path = os.path.join("data", "charadessta", "annotations")
+        annotation_folder_path = os.path.join("/mnt/cephfs/dataset/yishen/charadessta/annotations")
 
         with open(os.path.join(annotation_folder_path, split2filename[split]), "r") as annotation_info_file:
             csv_reader = csv.reader(annotation_info_file, delimiter=',')
@@ -133,29 +142,35 @@ def load_annotations_charadessta(split):
         "valid": "charades_sta_test.txt",
         "test": "charades_sta_test.txt"
     }
-    annotation_folder_path = os.path.join("data", "charadessta", "annotations", "glance")
+    annotation_folder_path = os.path.join("/mnt/cephfs/dataset/yishen/charadessta/annotations/glance")
+    
 
     annotations = {}
     with open(os.path.join(annotation_folder_path, split2filename[split]), "r") as annotation_file:
         lines = annotation_file.readlines()
+        j = 0
         for i in tqdm(range(len(lines)), desc="Loading Charades-STA {} annotations".format(split)):
             line = lines[i]
             video_id, start, end = line.split("##")[0].split()
-            start, end = float(start), float(end)
-            glance = float(line.split("##")[1])
-            annotation = line.split("##")[2].rstrip()
+            files_name = "/mnt/cephfs/dataset/yishen/charadessta/c3d" + "/" + video_id + ".pt"
+            if os.path.exists(files_name):
+                start, end = float(start), float(end)
+                glance = float(line.split("##")[1])
+                annotation = line.split("##")[2].rstrip()
 
-            annotations[i] = {
-                "idx": i,
-                "video_id": video_id,
-                "duration": durations[video_id],
+                annotations[j] = {
+                    "idx": j,
+                    "video_id": video_id,
+                    "duration": durations[video_id],
 
-                "annotation": annotation,
+                    "annotation": annotation,
 
-                "start_frac": safe_division(start, durations[video_id]),
-                "end_frac": safe_division(end, durations[video_id]),
-                "glance_frac": safe_division(glance, durations[video_id])
-            }
+                    "start_frac": safe_division(start, durations[video_id]),
+                    "end_frac": safe_division(end, durations[video_id]),
+                    "glance_frac": safe_division(glance, durations[video_id])
+                        }
+                j += 1
+
     return annotations
 
 
